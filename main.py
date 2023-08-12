@@ -33,9 +33,12 @@ def update_embed(participants: [discord.Member], needed):
 class EmbedView(View):
     def __init__(self, needed, original_participants, message_id, original_author):
         super().__init__()
+
         self.needed = needed
         self.message_id = message_id
         self.participants = original_participants
+        self.timeout = 60 * 120  # timeout in seconds
+        self.message = None
 
         self.add_button = Button(
             label="Count me in!",
@@ -50,6 +53,11 @@ class EmbedView(View):
         self.remove_button.callback = self.remove_button_callback
         self.add_item(self.add_button)
         self.add_item(self.remove_button)
+
+    # after certain amount of time, delete message
+    async def on_timeout(self):
+        if self.message:
+            await self.message.delete()
 
     async def add_button_callback(self, interaction: discord.Interaction):
         if interaction.user in self.participants:
@@ -128,7 +136,9 @@ async def need(context, needed: int, *members: discord.Member):
 
     view = EmbedView(needed, participants, context.message.id, context.author)
 
-    await context.send(view=view, embed=embed)
+    bot_message = await context.send(view=view, embed=embed)  # Store the bot message
+
+    view.message = bot_message
 
 
 @need.error
