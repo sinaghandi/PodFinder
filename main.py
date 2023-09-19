@@ -4,12 +4,14 @@ from discord.ui import Button, View
 from discord.ext import commands
 from config import BOT_TOKEN
 
+TIMEOUT = 60 * 120  # timeout in seconds
+
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
-def update_embed(participants: [discord.Member], needed):
+def update_embed(participants: [discord.Member], needed: int):
     """Generate an embed with updated names and countdown value.
 
     Args:
@@ -31,13 +33,25 @@ def update_embed(participants: [discord.Member], needed):
 
 
 class EmbedView(View):
-    def __init__(self, needed, original_participants, message_id, original_author):
+    def __init__(
+        self,
+        needed: int,
+        original_participants: list[discord.Member],
+        message_id,
+    ):
+        """Initialize EmbedView
+
+        Args:
+            needed: Integer specifying how many more are needed.
+            original_participants: List of discord.Member to initialize.
+            message_id: context.message.id from the initial command.
+        """
         super().__init__()
 
         self.needed = needed
         self.message_id = message_id
         self.participants = original_participants
-        self.timeout = 60 * 120  # timeout in seconds
+        self.timeout = TIMEOUT  # timeout in seconds
         self.message = None
 
         self.add_button = Button(
@@ -59,7 +73,11 @@ class EmbedView(View):
         if self.message:
             await self.message.delete()
 
-    async def add_button_callback(self, interaction: discord.Interaction):
+    # callback for button that adds a member into the queue
+    async def add_button_callback(
+        self,
+        interaction: discord.Interaction,
+    ):
         if interaction.user in self.participants:
             await interaction.response.send_message(
                 "You're already in the pod! Sit tight till you have enough to fire a "
@@ -88,6 +106,7 @@ class EmbedView(View):
                 )
             await interaction.message.edit(view=self, embed=embed)
 
+    # callback for button that removes a member from the queue
     async def remove_button_callback(self, interaction: discord.Interaction):
         if interaction.user in self.participants:
             await interaction.response.send_message(
@@ -112,7 +131,7 @@ class EmbedView(View):
 async def need(context, needed: int, *members: discord.Member):
     """Command to initialize the countdown and display it.
 
-    Usage: !need <number> <name1> <name2> ...
+    Usage: !need <number> <@user1> <@user2> ...
     """
     participants = list(members)
     if context.author not in participants:
@@ -124,8 +143,8 @@ async def need(context, needed: int, *members: discord.Member):
             )
     except IndexError:
         await context.send(
-            "Usage: !need <number> <name1> <name2> ... \nThe number needed and at least"
-            "one name must be provided."
+            "Usage: !need <number> <@user1> <@user2> ... \nThe number needed and at "
+            "least one name must be provided."
         )
         return
     except ValueError as e:
@@ -134,7 +153,7 @@ async def need(context, needed: int, *members: discord.Member):
 
     embed = update_embed(participants, needed)
 
-    view = EmbedView(needed, participants, context.message.id, context.author)
+    view = EmbedView(needed, participants, context.message.id)
 
     bot_message = await context.send(view=view, embed=embed)  # Store the bot message
 
